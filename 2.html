@@ -1,0 +1,267 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N_m3u8DL-RE 命令行生成器 (高级版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Microsoft YaHei', sans-serif;
+        }
+        /*移除了之前无法被浏览器直接解析的@apply样式*/
+        details > summary {
+            cursor: pointer;
+            list-style: none;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="flex border-b border-gray-700">
+            <button id="tab-generate" class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-200 bg-gray-800 text-white">生成新命令</button>
+            <button id="tab-modify" class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-200 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200">修改旧命令</button>
+        </div>
+
+        <!-- Tab 1: Generate New Command -->
+        <div id="content-generate" class="bg-gray-800 p-6 md:p-8 rounded-b-xl rounded-tr-xl">
+            <div class="space-y-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-center text-white">N_m3u8DL-RE 命令行生成器</h1>
+                    <p class="mt-2 text-center text-sm text-gray-400">输入信息，自动生成混流下载命令</p>
+                </div>
+
+                <!-- Input Form -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="video-url" class="block text-sm font-medium text-gray-300 mb-2">视频/清单链接 (.m3u8, .mpd)</label>
+                        <input type="url" id="video-url" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder="https://.../video.m3u8 或 .../manifest.mpd">
+                    </div>
+                    <div>
+                        <label for="audio-url" class="block text-sm font-medium text-gray-300 mb-2">音频链接 (可选, 若视频已包含音频则留空)</label>
+                        <input type="url" id="audio-url" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder="https://.../audio.m3u8">
+                    </div>
+                    <div>
+                        <label for="save-name" class="block text-sm font-medium text-gray-300 mb-2">保存文件名 (无需后缀)</label>
+                        <input type="text" id="save-name" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder="我的视频">
+                    </div>
+                </div>
+                
+                <!-- Advanced Options -->
+                <details class="group">
+                    <summary class="flex items-center justify-between py-2 text-sm font-medium text-gray-400 hover:text-white">
+                        <span>高级选项 (可选)</span>
+                        <svg class="w-5 h-5 transition-transform duration-200 group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </summary>
+                    <div class="mt-4 space-y-4 border-t border-gray-700 pt-4">
+                         <div>
+                            <label for="custom-headers" class="block text-sm font-medium text-gray-300 mb-2">自定义请求头 (一行一个)</label>
+                            <textarea id="custom-headers" rows="5" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3"></textarea>
+                        </div>
+                         <div>
+                            <label for="custom-params" class="block text-sm font-medium text-gray-300 mb-2">其他参数 (例如解密密钥)</label>
+                            <input type="text" id="custom-params" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder='--key "KID1:KEY1"'>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Action Button -->
+                <div>
+                    <button id="generate-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 mt-4">生成命令</button>
+                </div>
+
+                <!-- Output Section -->
+                <div id="output-section" class="hidden pt-4 space-y-3">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">生成的命令:</label>
+                    <div class="relative">
+                        <pre id="output-command" class="w-full bg-gray-900 text-green-400 rounded-md p-4 text-sm overflow-x-auto whitespace-pre-wrap break-all"></pre>
+                        <button id="copy-btn" class="absolute top-2 right-2 p-1.5 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" title="复制到剪贴板">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" /><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h6a2 2 0 00-2-2H5z" /></svg>
+                        </button>
+                    </div>
+                    <p id="copy-feedback" class="text-xs text-center text-green-500 h-4"></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab 2: Modify Existing Command -->
+        <div id="content-modify" class="bg-gray-800 p-6 md:p-8 rounded-b-xl rounded-tr-xl hidden">
+            <div class="space-y-6">
+                 <div>
+                    <h1 class="text-2xl font-bold text-center text-white">命令行解析与修改</h1>
+                    <p class="mt-2 text-center text-sm text-gray-400">粘贴完整命令，解析后即可修改</p>
+                </div>
+                <div>
+                    <label for="existing-command" class="block text-sm font-medium text-gray-300 mb-2">粘贴已有命令</label>
+                    <textarea id="existing-command" rows="6" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder='N_m3u8DL-RE "https://..." ... -M format=mkv'></textarea>
+                </div>
+                <div>
+                    <button id="parse-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500">解析并填充</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // DOM Elements
+        const videoUrlInput = document.getElementById('video-url');
+        const audioUrlInput = document.getElementById('audio-url');
+        const saveNameInput = document.getElementById('save-name');
+        const customHeadersInput = document.getElementById('custom-headers');
+        const customParamsInput = document.getElementById('custom-params');
+        const generateBtn = document.getElementById('generate-btn');
+        const outputSection = document.getElementById('output-section');
+        const outputCommand = document.getElementById('output-command');
+        const copyBtn = document.getElementById('copy-btn');
+        const copyFeedback = document.getElementById('copy-feedback');
+        
+        const tabGenerate = document.getElementById('tab-generate');
+        const tabModify = document.getElementById('tab-modify');
+        const contentGenerate = document.getElementById('content-generate');
+        const contentModify = document.getElementById('content-modify');
+
+        const existingCommandInput = document.getElementById('existing-command');
+        const parseBtn = document.getElementById('parse-btn');
+
+        const defaultHeaders = [
+            'Referer: https://hamivideo.hinet.net/',
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Origin: https://hamivideo.hinet.net',
+            'Accept: */*'
+        ].join('\n');
+        
+        const activeTabClasses = ['bg-gray-800', 'text-white'];
+        const inactiveTabClasses = ['bg-gray-700', 'text-gray-400', 'hover:bg-gray-600', 'hover:text-gray-200'];
+
+        // Functions
+        const setDefaultHeaders = () => {
+            customHeadersInput.value = defaultHeaders;
+        };
+        
+        const switchTab = (activeTab) => {
+            if (activeTab === 'generate') {
+                tabGenerate.classList.add(...activeTabClasses);
+                tabGenerate.classList.remove(...inactiveTabClasses);
+                tabModify.classList.add(...inactiveTabClasses);
+                tabModify.classList.remove(...activeTabClasses);
+                contentGenerate.classList.remove('hidden');
+                contentModify.classList.add('hidden');
+            } else {
+                tabModify.classList.add(...activeTabClasses);
+                tabModify.classList.remove(...inactiveTabClasses);
+                tabGenerate.classList.add(...inactiveTabClasses);
+                tabGenerate.classList.remove(...activeTabClasses);
+                contentModify.classList.remove('hidden');
+                contentGenerate.classList.add('hidden');
+            }
+        };
+
+        const generateCommand = () => {
+            const videoUrl = videoUrlInput.value.trim();
+            const audioUrl = audioUrlInput.value.trim();
+            const saveName = saveNameInput.value.trim();
+            const customHeaders = customHeadersInput.value.trim();
+            const customParams = customParamsInput.value.trim();
+
+            if (!videoUrl || !saveName) {
+                alert('“视频/清单链接”和“保存文件名”是必填项！');
+                return;
+            }
+
+            let command = 'N_m3u8DL-RE';
+            if (videoUrl) command += ` "${videoUrl}"`;
+            if (audioUrl) command += ` "${audioUrl}"`;
+            if (saveName) command += ` --save-name "${saveName}"`;
+
+            if (customHeaders) {
+                customHeaders.split('\n').forEach(header => {
+                    if (header.trim()) command += ` -H "${header.trim()}"`;
+                });
+            }
+            
+            if (customParams) command += ` ${customParams}`;
+
+            command += ' -M format=mkv --del-after-done true';
+
+            outputCommand.textContent = command;
+            outputSection.classList.remove('hidden');
+        };
+
+        const parseCommand = () => {
+            const commandStr = existingCommandInput.value.trim();
+            if (!commandStr) return;
+
+            // Regex to split command by spaces, but honoring quotes.
+            const args = commandStr.match(/(?:"[^"]*"|'[^']*'|[^"'\s]+)/g) || [];
+
+            let videoUrl = '';
+            let audioUrl = '';
+            let saveName = '';
+            const headers = [];
+            const otherParams = [];
+            const unquote = (str) => str ? str.replace(/^["']|["']$/g, '') : '';
+
+            for (let i = 0; i < args.length; i++) {
+                const arg = args[i];
+                const nextArg = args[i + 1];
+
+                if (arg === '--save-name' && nextArg) {
+                    saveName = unquote(nextArg);
+                    i++; 
+                } else if (arg === '-H' && nextArg) {
+                    headers.push(unquote(nextArg));
+                    i++;
+                } else if (unquote(arg).includes('.m3u8') || unquote(arg).includes('.mpd')) {
+                    const currentUrl = unquote(arg);
+                    if (!videoUrl) videoUrl = currentUrl;
+                    else if (!audioUrl) audioUrl = currentUrl;
+                } else if (!['N_m3u8DL-RE', '-M', 'format=mkv', '--del-after-done', 'true'].some(s => arg.includes(s))) {
+                    otherParams.push(arg);
+                }
+            }
+
+            // Populate the form
+            videoUrlInput.value = videoUrl;
+            audioUrlInput.value = audioUrl;
+            saveNameInput.value = saveName;
+            customHeadersInput.value = headers.join('\n');
+            customParamsInput.value = otherParams.join(' ');
+            
+            alert('解析完成！已将参数填充到“生成新命令”面板。');
+            switchTab('generate');
+        };
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', setDefaultHeaders);
+        
+        tabGenerate.addEventListener('click', () => switchTab('generate'));
+        tabModify.addEventListener('click', () => switchTab('modify'));
+        
+        generateBtn.addEventListener('click', generateCommand);
+        parseBtn.addEventListener('click', parseCommand);
+
+        copyBtn.addEventListener('click', () => {
+            const commandToCopy = outputCommand.textContent;
+            const textArea = document.createElement('textarea');
+            textArea.value = commandToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                copyFeedback.textContent = '已成功复制到剪贴板！';
+            } catch (err) {
+                copyFeedback.textContent = '复制失败，请手动复制。';
+                console.error('Copy failed:', err);
+            }
+            document.body.removeChild(textArea);
+            setTimeout(() => { copyFeedback.textContent = ''; }, 2000);
+        });
+    </script>
+</body>
+</html>
+
