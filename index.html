@@ -250,11 +250,8 @@
             saveProxies(reindexed);
         };
 
-        const initializeDefaultProxy = () => {
-            const proxies = getProxies();
-            if (Object.keys(proxies).length === 0) {
-                addProxy('默认代理', 'http://iyf:0716@38.182.122.197:3128');
-            }
+        const initializeDefaultProxy = () => {
+            // 公开版本中不设置任何默认代理
         };
 
         const updateProxySelect = () => {
@@ -503,3 +500,4 @@
     </script>
 </body>
 </html>
+
