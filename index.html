@@ -1,16 +1,15 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N_m3u8DL-RE 命令行生成器 (高级版)</title>
+    <title>N_m3u8DL-RE 命令行生成器 (增强版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', 'Microsoft YaHei', sans-serif;
         }
-        /*移除了之前无法被浏览器直接解析的@apply样式*/
         details > summary {
             cursor: pointer;
             list-style: none;
@@ -48,6 +47,27 @@
                     <div>
                         <label for="save-name" class="block text-sm font-medium text-gray-300 mb-2">保存文件名 (无需后缀)</label>
                         <input type="text" id="save-name" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder="我的视频">
+                    </div>
+                </div>
+                
+                <!-- Proxy Settings -->
+                <div class="bg-gray-700/50 rounded-lg p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm font-medium text-gray-300">代理设置</label>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400">启用</span>
+                            <input type="checkbox" id="enable-proxy" checked class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500 focus:ring-2">
+                        </div>
+                    </div>
+                    <div id="proxy-input-container">
+                        <div class="flex gap-2 mb-2">
+                            <select id="proxy-select" class="flex-1 bg-gray-700 border-gray-600 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3">
+                                <option value="">-- 选择已保存的代理 --</option>
+                            </select>
+                            <button id="manage-proxy-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">管理</button>
+                        </div>
+                        <input type="text" id="proxy-url" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-3" placeholder="http://user:pass@proxy.com:port">
+                        <p class="mt-1 text-xs text-gray-400">格式: http://用户名:密码@代理地址:端口</p>
                     </div>
                 </div>
                 
@@ -107,11 +127,47 @@
 
     </div>
 
+    <!-- Proxy Management Modal -->
+    <div id="proxy-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-white">代理管理</h2>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Add New Proxy -->
+            <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                <h3 class="text-sm font-medium text-gray-300 mb-3">添加新代理</h3>
+                <div class="space-y-2">
+                    <input type="text" id="new-proxy-name" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm p-2" placeholder="代理名称 (例如: 我的代理)">
+                    <input type="text" id="new-proxy-url" class="block w-full bg-gray-700 border-gray-600 text-white rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm p-2" placeholder="http://user:pass@proxy.com:port">
+                    <button id="add-proxy-btn" class="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">添加</button>
+                </div>
+            </div>
+            
+            <!-- Proxy List -->
+            <div>
+                <h3 class="text-sm font-medium text-gray-300 mb-3">已保存的代理</h3>
+                <div id="proxy-list" class="space-y-2">
+                    <!-- Proxy items will be inserted here -->
+                </div>
+                <p id="no-proxy-message" class="text-sm text-gray-500 text-center py-4 hidden">暂无保存的代理</p>
+            </div>
+        </div>
+    </div>
+
     <script>
         // DOM Elements
         const videoUrlInput = document.getElementById('video-url');
         const audioUrlInput = document.getElementById('audio-url');
         const saveNameInput = document.getElementById('save-name');
+        const enableProxyCheckbox = document.getElementById('enable-proxy');
+        const proxyUrlInput = document.getElementById('proxy-url');
+        const proxyInputContainer = document.getElementById('proxy-input-container');
+        const proxySelect = document.getElementById('proxy-select');
+        const manageProxyBtn = document.getElementById('manage-proxy-btn');
         const customHeadersInput = document.getElementById('custom-headers');
         const customParamsInput = document.getElementById('custom-params');
         const generateBtn = document.getElementById('generate-btn');
@@ -128,6 +184,15 @@
         const existingCommandInput = document.getElementById('existing-command');
         const parseBtn = document.getElementById('parse-btn');
 
+        // Proxy Modal Elements
+        const proxyModal = document.getElementById('proxy-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const newProxyName = document.getElementById('new-proxy-name');
+        const newProxyUrl = document.getElementById('new-proxy-url');
+        const addProxyBtn = document.getElementById('add-proxy-btn');
+        const proxyList = document.getElementById('proxy-list');
+        const noProxyMessage = document.getElementById('no-proxy-message');
+
         const defaultHeaders = [
             'Referer: https://hamivideo.hinet.net/',
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -138,9 +203,123 @@
         const activeTabClasses = ['bg-gray-800', 'text-white'];
         const inactiveTabClasses = ['bg-gray-700', 'text-gray-400', 'hover:bg-gray-600', 'hover:text-gray-200'];
 
+        // Proxy Storage Functions
+        const getProxies = () => {
+            const proxies = {};
+            let i = 0;
+            while (true) {
+                const name = sessionStorage.getItem(`proxy_${i}_name`);
+                const url = sessionStorage.getItem(`proxy_${i}_url`);
+                if (name === null || url === null) break;
+                proxies[i] = { name, url };
+                i++;
+            }
+            return proxies;
+        };
+
+        const saveProxies = (proxies) => {
+            // Clear existing
+            let i = 0;
+            while (sessionStorage.getItem(`proxy_${i}_name`) !== null) {
+                sessionStorage.removeItem(`proxy_${i}_name`);
+                sessionStorage.removeItem(`proxy_${i}_url`);
+                i++;
+            }
+            // Save new
+            Object.keys(proxies).forEach((key, index) => {
+                sessionStorage.setItem(`proxy_${index}_name`, proxies[key].name);
+                sessionStorage.setItem(`proxy_${index}_url`, proxies[key].url);
+            });
+        };
+
+        const addProxy = (name, url) => {
+            const proxies = getProxies();
+            const newId = Object.keys(proxies).length;
+            proxies[newId] = { name, url };
+            saveProxies(proxies);
+            return newId;
+        };
+
+        const deleteProxy = (id) => {
+            const proxies = getProxies();
+            delete proxies[id];
+            const reindexed = {};
+            Object.values(proxies).forEach((proxy, index) => {
+                reindexed[index] = proxy;
+            });
+            saveProxies(reindexed);
+        };
+
+        const initializeDefaultProxy = () => {
+            const proxies = getProxies();
+            if (Object.keys(proxies).length === 0) {
+                addProxy('默认代理', 'http://iyf:0716@38.182.122.197:3128');
+            }
+        };
+
+        const updateProxySelect = () => {
+            const proxies = getProxies();
+            proxySelect.innerHTML = '<option value="">-- 选择已保存的代理 --</option>';
+            Object.keys(proxies).forEach(id => {
+                const option = document.createElement('option');
+                option.value = proxies[id].url;
+                option.textContent = proxies[id].name;
+                proxySelect.appendChild(option);
+            });
+            
+            // Auto-select first proxy if available
+            if (Object.keys(proxies).length > 0 && !proxyUrlInput.value) {
+                const firstProxy = proxies[Object.keys(proxies)[0]];
+                proxyUrlInput.value = firstProxy.url;
+                proxySelect.value = firstProxy.url;
+            }
+        };
+
+        const renderProxyList = () => {
+            const proxies = getProxies();
+            proxyList.innerHTML = '';
+            
+            if (Object.keys(proxies).length === 0) {
+                noProxyMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noProxyMessage.classList.add('hidden');
+            Object.keys(proxies).forEach(id => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-3 bg-gray-700 rounded-md';
+                div.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-white truncate">${proxies[id].name}</p>
+                        <p class="text-xs text-gray-400 truncate">${proxies[id].url}</p>
+                    </div>
+                    <button class="ml-2 p-1.5 text-red-400 hover:text-red-300 focus:outline-none" onclick="deleteProxyById(${id})">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                `;
+                proxyList.appendChild(div);
+            });
+        };
+
+        window.deleteProxyById = (id) => {
+            if (confirm('确定要删除这个代理吗？')) {
+                deleteProxy(id);
+                renderProxyList();
+                updateProxySelect();
+            }
+        };
+
         // Functions
         const setDefaultHeaders = () => {
             customHeadersInput.value = defaultHeaders;
+        };
+        
+        const toggleProxyInput = () => {
+            if (enableProxyCheckbox.checked) {
+                proxyInputContainer.style.display = 'block';
+            } else {
+                proxyInputContainer.style.display = 'none';
+            }
         };
         
         const switchTab = (activeTab) => {
@@ -165,11 +344,13 @@
             const videoUrl = videoUrlInput.value.trim();
             const audioUrl = audioUrlInput.value.trim();
             const saveName = saveNameInput.value.trim();
+            const enableProxy = enableProxyCheckbox.checked;
+            const proxyUrl = proxyUrlInput.value.trim();
             const customHeaders = customHeadersInput.value.trim();
             const customParams = customParamsInput.value.trim();
 
             if (!videoUrl || !saveName) {
-                alert('“视频/清单链接”和“保存文件名”是必填项！');
+                alert('"视频/清单链接"和"保存文件名"是必填项！');
                 return;
             }
 
@@ -184,6 +365,10 @@
                 });
             }
             
+            if (enableProxy && proxyUrl) {
+                command += ` --custom-proxy "${proxyUrl}"`;
+            }
+            
             if (customParams) command += ` ${customParams}`;
 
             command += ' -M format=mkv --del-after-done true';
@@ -196,12 +381,12 @@
             const commandStr = existingCommandInput.value.trim();
             if (!commandStr) return;
 
-            // Regex to split command by spaces, but honoring quotes.
             const args = commandStr.match(/(?:"[^"]*"|'[^']*'|[^"'\s]+)/g) || [];
 
             let videoUrl = '';
             let audioUrl = '';
             let saveName = '';
+            let proxyUrl = '';
             const headers = [];
             const otherParams = [];
             const unquote = (str) => str ? str.replace(/^["']|["']$/g, '') : '';
@@ -216,6 +401,9 @@
                 } else if (arg === '-H' && nextArg) {
                     headers.push(unquote(nextArg));
                     i++;
+                } else if (arg === '--custom-proxy' && nextArg) {
+                    proxyUrl = unquote(nextArg);
+                    i++;
                 } else if (unquote(arg).includes('.m3u8') || unquote(arg).includes('.mpd')) {
                     const currentUrl = unquote(arg);
                     if (!videoUrl) videoUrl = currentUrl;
@@ -225,19 +413,70 @@
                 }
             }
 
-            // Populate the form
             videoUrlInput.value = videoUrl;
             audioUrlInput.value = audioUrl;
             saveNameInput.value = saveName;
             customHeadersInput.value = headers.join('\n');
             customParamsInput.value = otherParams.join(' ');
             
-            alert('解析完成！已将参数填充到“生成新命令”面板。');
+            if (proxyUrl) {
+                enableProxyCheckbox.checked = true;
+                proxyUrlInput.value = proxyUrl;
+                proxySelect.value = proxyUrl;
+            } else {
+                enableProxyCheckbox.checked = false;
+            }
+            toggleProxyInput();
+            
+            alert('解析完成！已将参数填充到"生成新命令"面板。');
             switchTab('generate');
         };
 
         // Event Listeners
-        document.addEventListener('DOMContentLoaded', setDefaultHeaders);
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeDefaultProxy();
+            setDefaultHeaders();
+            toggleProxyInput();
+            updateProxySelect();
+        });
+        
+        enableProxyCheckbox.addEventListener('change', toggleProxyInput);
+        
+        proxySelect.addEventListener('change', (e) => {
+            proxyUrlInput.value = e.target.value;
+        });
+        
+        manageProxyBtn.addEventListener('click', () => {
+            renderProxyList();
+            proxyModal.classList.remove('hidden');
+        });
+        
+        closeModalBtn.addEventListener('click', () => {
+            proxyModal.classList.add('hidden');
+        });
+        
+        proxyModal.addEventListener('click', (e) => {
+            if (e.target === proxyModal) {
+                proxyModal.classList.add('hidden');
+            }
+        });
+        
+        addProxyBtn.addEventListener('click', () => {
+            const name = newProxyName.value.trim();
+            const url = newProxyUrl.value.trim();
+            
+            if (!name || !url) {
+                alert('请填写代理名称和地址！');
+                return;
+            }
+            
+            addProxy(name, url);
+            newProxyName.value = '';
+            newProxyUrl.value = '';
+            renderProxyList();
+            updateProxySelect();
+            alert('代理添加成功！');
+        });
         
         tabGenerate.addEventListener('click', () => switchTab('generate'));
         tabModify.addEventListener('click', () => switchTab('modify'));
@@ -264,5 +503,3 @@
     </script>
 </body>
 </html>
-
-
